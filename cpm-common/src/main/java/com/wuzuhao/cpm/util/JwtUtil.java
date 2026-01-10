@@ -4,6 +4,7 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 
 import java.util.Date;
@@ -25,7 +26,8 @@ public class JwtUtil {
     /**
      * 生成Token
      */
-    public String generateToken(Long userId, String username, String role) {
+    @NonNull
+    public String generateToken(@NonNull Long userId, @NonNull String username, @NonNull String role) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("userId", userId);
         claims.put("username", username);
@@ -36,7 +38,8 @@ public class JwtUtil {
     /**
      * 创建Token
      */
-    private String createToken(Map<String, Object> claims) {
+    @NonNull
+    private String createToken(@NonNull Map<String, Object> claims) {
         return Jwts.builder()
                 .setClaims(claims)
                 .setIssuedAt(new Date())
@@ -48,7 +51,8 @@ public class JwtUtil {
     /**
      * 从Token中获取Claims
      */
-    public Claims getClaimsFromToken(String token) {
+    @NonNull
+    public Claims getClaimsFromToken(@NonNull String token) {
         return Jwts.parser()
                 .setSigningKey(secret)
                 .parseClaimsJws(token)
@@ -58,7 +62,8 @@ public class JwtUtil {
     /**
      * 从Token中获取用户ID
      */
-    public Long getUserIdFromToken(String token) {
+    @NonNull
+    public Long getUserIdFromToken(@NonNull String token) {
         Claims claims = getClaimsFromToken(token);
         return Long.valueOf(claims.get("userId").toString());
     }
@@ -66,7 +71,8 @@ public class JwtUtil {
     /**
      * 从Token中获取用户名
      */
-    public String getUsernameFromToken(String token) {
+    @NonNull
+    public String getUsernameFromToken(@NonNull String token) {
         Claims claims = getClaimsFromToken(token);
         return claims.get("username").toString();
     }
@@ -74,7 +80,8 @@ public class JwtUtil {
     /**
      * 从Token中获取角色
      */
-    public String getRoleFromToken(String token) {
+    @NonNull
+    public String getRoleFromToken(@NonNull String token) {
         Claims claims = getClaimsFromToken(token);
         return claims.get("role").toString();
     }
@@ -82,7 +89,8 @@ public class JwtUtil {
     /**
      * 验证Token是否过期
      */
-    public Boolean isTokenExpired(String token) {
+    @NonNull
+    public Boolean isTokenExpired(@NonNull String token) {
         try {
             Claims claims = getClaimsFromToken(token);
             Date expiration = claims.getExpiration();
@@ -95,7 +103,8 @@ public class JwtUtil {
     /**
      * 验证Token是否有效
      */
-    public Boolean validateToken(String token) {
+    @NonNull
+    public Boolean validateToken(@NonNull String token) {
         try {
             return !isTokenExpired(token);
         } catch (Exception e) {

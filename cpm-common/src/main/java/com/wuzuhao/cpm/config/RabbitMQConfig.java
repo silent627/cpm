@@ -7,6 +7,7 @@ import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
 import org.springframework.amqp.support.converter.MessageConverter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.lang.NonNull;
 
 /**
  * RabbitMQ配置类
@@ -33,6 +34,7 @@ public class RabbitMQConfig {
      * 消息转换器
      */
     @Bean
+    @NonNull
     public MessageConverter messageConverter() {
         return new Jackson2JsonMessageConverter();
     }
@@ -41,7 +43,8 @@ public class RabbitMQConfig {
      * RabbitTemplate配置
      */
     @Bean
-    public RabbitTemplate rabbitTemplate(ConnectionFactory connectionFactory) {
+    @NonNull
+    public RabbitTemplate rabbitTemplate(@NonNull ConnectionFactory connectionFactory) {
         RabbitTemplate template = new RabbitTemplate(connectionFactory);
         template.setMessageConverter(messageConverter());
         return template;
@@ -49,16 +52,19 @@ public class RabbitMQConfig {
 
     // ========== 居民数据同步 ==========
     @Bean
+    @NonNull
     public Queue residentSyncQueue() {
         return QueueBuilder.durable(RESIDENT_SYNC_QUEUE).build();
     }
 
     @Bean
+    @NonNull
     public DirectExchange residentSyncExchange() {
         return new DirectExchange(RESIDENT_SYNC_EXCHANGE);
     }
 
     @Bean
+    @NonNull
     public Binding residentSyncBinding() {
         return BindingBuilder.bind(residentSyncQueue())
                 .to(residentSyncExchange())
@@ -67,16 +73,19 @@ public class RabbitMQConfig {
 
     // ========== 户籍数据同步 ==========
     @Bean
+    @NonNull
     public Queue householdSyncQueue() {
         return QueueBuilder.durable(HOUSEHOLD_SYNC_QUEUE).build();
     }
 
     @Bean
+    @NonNull
     public DirectExchange householdSyncExchange() {
         return new DirectExchange(HOUSEHOLD_SYNC_EXCHANGE);
     }
 
     @Bean
+    @NonNull
     public Binding householdSyncBinding() {
         return BindingBuilder.bind(householdSyncQueue())
                 .to(householdSyncExchange())
@@ -85,16 +94,19 @@ public class RabbitMQConfig {
 
     // ========== 搜索索引更新 ==========
     @Bean
+    @NonNull
     public Queue searchIndexQueue() {
         return QueueBuilder.durable(SEARCH_INDEX_QUEUE).build();
     }
 
     @Bean
+    @NonNull
     public DirectExchange searchIndexExchange() {
         return new DirectExchange(SEARCH_INDEX_EXCHANGE);
     }
 
     @Bean
+    @NonNull
     public Binding searchIndexBinding() {
         return BindingBuilder.bind(searchIndexQueue())
                 .to(searchIndexExchange())

@@ -6,6 +6,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.lang.NonNull;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 
@@ -24,9 +26,11 @@ public class RateLimitInterceptor implements HandlerInterceptor {
     private static final Logger log = LoggerFactory.getLogger(RateLimitInterceptor.class);
 
     @Autowired
+    @NonNull
     private RedisTemplate<String, Object> redisTemplate;
 
     @Autowired
+    @NonNull
     private ObjectMapper objectMapper;
 
     // 限流配置
@@ -34,10 +38,14 @@ public class RateLimitInterceptor implements HandlerInterceptor {
     private static final String RATE_LIMIT_PREFIX = "rate_limit:";
 
     @Override
-    public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
+    public boolean preHandle(@NonNull HttpServletRequest request, @NonNull HttpServletResponse response, @NonNull Object handler) throws Exception {
         try {
             // 获取客户端IP
             String clientIp = getClientIp(request);
+            if (clientIp == null || clientIp.isEmpty()) {
+                // 如果无法获取IP，使用默认值
+                clientIp = "unknown";
+            }
             String key = RATE_LIMIT_PREFIX + clientIp;
 
             // 获取当前请求次数
@@ -67,8 +75,10 @@ public class RateLimitInterceptor implements HandlerInterceptor {
 
     /**
      * 获取客户端真实IP
+     * @return IP地址，如果无法获取则返回null
      */
-    private String getClientIp(HttpServletRequest request) {
+    @Nullable
+    private String getClientIp(@NonNull HttpServletRequest request) {
         String ip = request.getHeader("X-Forwarded-For");
         if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
             ip = request.getHeader("Proxy-Client-IP");
@@ -89,7 +99,7 @@ public class RateLimitInterceptor implements HandlerInterceptor {
     /**
      * 发送错误响应
      */
-    private void sendErrorResponse(HttpServletResponse response, String message) throws IOException {
+    private void sendErrorResponse(@NonNull HttpServletResponse response, @NonNull String message) throws IOException {
         response.setStatus(429); // 429 Too Many Requests
         response.setContentType("application/json;charset=UTF-8");
         Result<?> result = Result.error(message);
