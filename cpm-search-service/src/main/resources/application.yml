@@ -1,0 +1,65 @@
+server:
+  port: 8085
+
+spring:
+  application:
+    name: cpm-search-service
+  config:
+    import: optional:nacos:${spring.application.name}.yml
+  mvc:
+    pathmatch:
+      matching-strategy: ant_path_matcher
+  cloud:
+    nacos:
+      discovery:
+        server-addr: localhost:8848
+        namespace: public
+      config:
+        server-addr: localhost:8848
+        file-extension: yml
+  elasticsearch:
+    uris: http://localhost:9200
+    connection-timeout: 3s
+    socket-timeout: 30s
+  redis:
+    host: localhost
+    port: 6379
+    database: 0
+    timeout: 6000ms
+    lettuce:
+      pool:
+        max-active: 8
+        max-wait: -1ms
+        max-idle: 8
+        min-idle: 0
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
+    virtual-host: /
+  # Zipkin 分布式追踪配置
+  sleuth:
+    zipkin:
+      base-url: ${ZIPKIN_BASE_URL:http://zipkin:9411}
+    sampler:
+      probability: 1.0  # 采样率，1.0 表示 100% 采样
+  # Sentinel 流量控制配置
+  sentinel:
+    transport:
+      dashboard: ${SENTINEL_DASHBOARD:http://sentinel:8858}
+      port: 8719
+    # 流控规则配置
+    flow:
+      enabled: true
+    # 熔断降级配置
+    degrade:
+      enabled: true
+
+jwt:
+  secret: cpm-community-population-management-system-secret-key-2024
+  expiration: 86400000
+
+knife4j:
+  enable: true
+  production: false

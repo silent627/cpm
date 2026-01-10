@@ -1,0 +1,148 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: cpm-gateway
+  config:
+    import: optional:nacos:${spring.application.name}.yml
+  cloud:
+    nacos:
+      discovery:
+        server-addr: ${SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR:localhost:8848}
+        namespace: ${SPRING_CLOUD_NACOS_DISCOVERY_NAMESPACE:public}
+      config:
+        server-addr: ${SPRING_CLOUD_NACOS_CONFIG_SERVER_ADDR:localhost:8848}
+        namespace: ${SPRING_CLOUD_NACOS_CONFIG_NAMESPACE:}
+        file-extension: yml
+    gateway:
+      discovery:
+        locator:
+          enabled: true
+          lower-case-service-id: true
+      routes:
+        # 文件访问路由（必须在最前面，确保优先匹配）- 转发到文件服务，由文件服务提供静态文件访问
+        - id: file-access-service
+          uri: lb://cpm-file-service
+          predicates:
+            - Path=/uploads/**
+          filters:
+            - StripPrefix=0
+        # 用户服务路由 - 用户管理
+        - id: user-service
+          uri: lb://cpm-user-service
+          predicates:
+            - Path=/api/user/**
+          filters:
+            - StripPrefix=1
+        # 用户服务路由 - 认证管理
+        - id: auth-service
+          uri: lb://cpm-user-service
+          predicates:
+            - Path=/api/auth/**
+          filters:
+            - StripPrefix=1
+        # 用户服务路由 - 管理员管理
+        - id: admin-service
+          uri: lb://cpm-user-service
+          predicates:
+            - Path=/api/admin/**
+          filters:
+            - StripPrefix=1
+        # 通知服务路由 - 验证码（转发到通知服务）
+        - id: captcha-service
+          uri: lb://cpm-notification-service
+          predicates:
+            - Path=/api/captcha/**
+          filters:
+            - StripPrefix=1
+        # 通知服务路由 - 通知服务
+        - id: notification-service
+          uri: lb://cpm-notification-service
+          predicates:
+            - Path=/api/notification/**
+          filters:
+            - StripPrefix=1
+        # 用户服务路由 - 行政区划
+        - id: region-service
+          uri: lb://cpm-user-service
+          predicates:
+            - Path=/api/region/**
+          filters:
+            - StripPrefix=1
+        # 居民服务路由
+        - id: resident-service
+          uri: lb://cpm-resident-service
+          predicates:
+            - Path=/api/resident/**
+          filters:
+            - StripPrefix=1
+        # 户籍服务路由 - 户籍管理
+        - id: household-service
+          uri: lb://cpm-household-service
+          predicates:
+            - Path=/api/household/**
+          filters:
+            - StripPrefix=1
+        # 户籍服务路由 - 户籍成员管理
+        - id: household-member-service
+          uri: lb://cpm-household-service
+          predicates:
+            - Path=/api/household-member/**
+          filters:
+            - StripPrefix=1
+        # 统计服务路由
+        - id: statistics-service
+          uri: lb://cpm-statistics-service
+          predicates:
+            - Path=/api/statistics/**
+          filters:
+            - StripPrefix=1
+        # 搜索服务路由
+        - id: search-service
+          uri: lb://cpm-search-service
+          predicates:
+            - Path=/api/search/**
+          filters:
+            - StripPrefix=1
+        # 文件上传接口路由（转发到文件服务）
+        - id: upload-api-service
+          uri: lb://cpm-file-service
+          predicates:
+            - Path=/api/upload/**
+          filters:
+            - StripPrefix=1
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            # allowCredentials=true 时不能使用 allowedOrigins: "*"，改为 patterns
+            allowedOriginPatterns: "*"
+            allowedMethods: "*"
+            allowedHeaders: "*"
+            allowCredentials: true
+  # Zipkin 分布式追踪配置
+  sleuth:
+    zipkin:
+      base-url: ${ZIPKIN_BASE_URL:http://zipkin:9411}
+    sampler:
+      probability: 1.0  # 采样率，1.0 表示 100% 采样
+  # Sentinel 流量控制配置
+  sentinel:
+    transport:
+      dashboard: ${SENTINEL_DASHBOARD:http://sentinel:8858}
+      port: 8719
+    # 流控规则配置
+    flow:
+      enabled: true
+    # 熔断降级配置
+    degrade:
+      enabled: true
+
+# Knife4j配置
+knife4j:
+  gateway:
+    enabled: true
+    strategy: discover
+    discover:
+      enabled: true
+      version: 3.0.3

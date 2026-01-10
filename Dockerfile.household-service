@@ -1,0 +1,34 @@
+# 构建阶段
+FROM maven:3.8.6-openjdk-8-slim AS build
+WORKDIR /app
+
+# 复制pom文件
+COPY pom.xml .
+COPY cpm-common/pom.xml ./cpm-common/
+COPY cpm-household-service/pom.xml ./cpm-household-service/
+
+# 修改父pom.xml，只保留当前需要的模块
+RUN awk '/<modules>/{print; print "        <module>cpm-common</module>"; print "        <module>cpm-household-service</module>"; next} /<\/modules>/{print; next} /<module>/ && !/<modules>/ && !/<\/modules>/{next} {print}' pom.xml > pom.xml.tmp && mv pom.xml.tmp pom.xml
+
+# 先复制 cpm-common 的源代码并安装，以便后续模块可以依赖它
+COPY cpm-common/src ./cpm-common/src
+RUN mvn clean install -DskipTests -pl cpm-common -am
+
+# 复制 household-service 的源代码
+COPY cpm-household-service/src ./cpm-household-service/src
+
+# 构建项目
+RUN mvn clean package -DskipTests -pl cpm-household-service -am
+
+# 运行阶段
+FROM openjdk:8-jre-slim
+WORKDIR /app
+
+# 复制jar文件（排除原始jar，只复制Spring Boot打包的可执行jar）
+COPY --from=build /app/cpm-household-service/target/cpm-household-service-*.jar app.jar
+
+# 暴露端口
+EXPOSE 8083
+
+# 启动应用
+ENTRYPOINT ["java", "-jar", "app.jar"]

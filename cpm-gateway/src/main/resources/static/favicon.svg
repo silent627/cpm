@@ -1,0 +1,19 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- 背景 -->
+  <rect width="32" height="32" rx="6" fill="#4095FF"/>
+  
+  <!-- 房子图标 -->
+  <path d="M16 6L8 12V26H12V18H20V26H24V12L16 6Z" fill="white"/>
+  
+  <!-- 门 -->
+  <rect x="13" y="20" width="6" height="6" rx="1" fill="#4095FF"/>
+  
+  <!-- 窗户 -->
+  <rect x="10" y="14" width="3" height="3" rx="0.5" fill="#4095FF"/>
+  <rect x="19" y="14" width="3" height="3" rx="0.5" fill="#4095FF"/>
+  
+  <!-- 人群图标（代表人口管理） -->
+  <circle cx="10" cy="28" r="2" fill="white" opacity="0.8"/>
+  <circle cx="16" cy="28" r="2" fill="white" opacity="0.8"/>
+  <circle cx="22" cy="28" r="2" fill="white" opacity="0.8"/>
+</svg>

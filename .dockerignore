@@ -1,0 +1,39 @@
+# Git
+.git
+.gitignore
+
+# Docker
+docker-compose.yml
+Dockerfile*
+.dockerignore
+
+# Node modules (前端会重新安装)
+**/node_modules
+**/npm
+
+# 构建产物
+**/target
+**/dist
+
+# IDE
+.idea
+.vscode
+*.iml
+
+# 日志
+*.log
+
+# 临时文件
+*.tmp
+*.temp
+**/__pycache__
+**/*.pyc
+
+# 文档
+*.md
+!README.md
+
+# 其他
+uploads
+*.bat
+*.docx

@@ -1,0 +1,80 @@
+server:
+  port: 8087
+
+spring:
+  application:
+    name: cpm-notification-service
+  config:
+    import: optional:nacos:${spring.application.name}.yml
+  mvc:
+    pathmatch:
+      matching-strategy: ant_path_matcher
+  cloud:
+    nacos:
+      discovery:
+        server-addr: ${SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR:localhost:8848}
+        namespace: ${SPRING_CLOUD_NACOS_DISCOVERY_NAMESPACE:}
+      config:
+        server-addr: ${SPRING_CLOUD_NACOS_CONFIG_SERVER_ADDR:localhost:8848}
+        namespace: ${SPRING_CLOUD_NACOS_CONFIG_NAMESPACE:}
+        file-extension: yml
+    sentinel:
+      transport:
+        dashboard: ${SENTINEL_DASHBOARD:http://sentinel:8858}
+        port: 8719
+      # 流控规则配置
+      flow:
+        enabled: true
+      # 熔断降级配置
+      degrade:
+        enabled: true
+  # Redis配置
+  redis:
+    host: ${REDIS_HOST:localhost}
+    port: ${REDIS_PORT:6379}
+    password: ${REDIS_PASSWORD:}
+    database: 0
+    timeout: 3000ms
+    lettuce:
+      pool:
+        max-active: 8
+        max-idle: 8
+        min-idle: 0
+        max-wait: -1ms
+  # 邮件配置
+  mail:
+    host: ${MAIL_HOST:smtp.qq.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:3357276026@qq.com}
+    password: ${MAIL_PASSWORD:zubjafvksuqxcjhh}
+    from: ${MAIL_FROM:3357276026@qq.com}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+          timeout: 10000
+          connectiontimeout: 10000
+  # Zipkin 分布式追踪配置
+  sleuth:
+    zipkin:
+      base-url: ${ZIPKIN_BASE_URL:http://zipkin:9411}
+    sampler:
+      probability: 1.0  # 采样率，1.0 表示 100% 采样
+
+# JWT配置
+jwt:
+  secret: cpm-community-population-management-system-secret-key-2024
+  expiration: 86400000
+
+# Knife4j配置
+knife4j:
+  enable: true
+  openapi:
+    title: 通知服务API文档
+    description: 通知服务接口文档
+    version: 1.0.0
+    contact:
+      name: CPM开发团队

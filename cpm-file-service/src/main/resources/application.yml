@@ -1,0 +1,47 @@
+server:
+  port: 8086
+
+spring:
+  application:
+    name: cpm-file-service
+  config:
+    import: optional:nacos:${spring.application.name}.yml
+  mvc:
+    pathmatch:
+      matching-strategy: ant_path_matcher
+  cloud:
+    nacos:
+      discovery:
+        server-addr: localhost:8848
+        namespace: public
+      config:
+        server-addr: localhost:8848
+        file-extension: yml
+  # Zipkin 分布式追踪配置
+  sleuth:
+    zipkin:
+      base-url: ${ZIPKIN_BASE_URL:http://zipkin:9411}
+    sampler:
+      probability: 1.0  # 采样率，1.0 表示 100% 采样
+  # Sentinel 流量控制配置
+  sentinel:
+    transport:
+      dashboard: ${SENTINEL_DASHBOARD:http://sentinel:8858}
+      port: 8719
+    # 流控规则配置
+    flow:
+      enabled: true
+    # 熔断降级配置
+    degrade:
+      enabled: true
+
+
+# 文件上传配置
+file:
+  upload:
+    path: ${FILE_UPLOAD_PATH:uploads}
+    url-prefix: ${FILE_UPLOAD_URL_PREFIX:/uploads}
+
+knife4j:
+  enable: true
+  production: false
