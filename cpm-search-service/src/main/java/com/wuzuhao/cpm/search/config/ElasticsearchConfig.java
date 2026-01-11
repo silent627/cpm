@@ -1,29 +1,56 @@
 package com.wuzuhao.cpm.search.config;
 
+import co.elastic.clients.elasticsearch.ElasticsearchClient;
+import co.elastic.clients.json.jackson.JacksonJsonpMapper;
+import co.elastic.clients.transport.ElasticsearchTransport;
+import co.elastic.clients.transport.rest_client.RestClientTransport;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.http.HttpHost;
 import org.elasticsearch.client.RestClient;
-import org.elasticsearch.client.RestHighLevelClient;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
  * Elasticsearch配置类
  * 
- * 注意：RestHighLevelClient 已弃用（自Elasticsearch 7.15版本起）
- * 建议迁移到新的 ElasticsearchClient API
- * 当前保留此配置以维持现有功能，后续版本需要升级到新的客户端
+ * 使用新的 ElasticsearchClient API (Elasticsearch Java Client)
  */
 @Configuration
-@SuppressWarnings("deprecation")
 public class ElasticsearchConfig {
 
+    @Value("${spring.elasticsearch.uris:http://localhost:9200}")
+    private String elasticsearchUris;
+
     @Bean
-    public RestHighLevelClient restHighLevelClient() {
-        return new RestHighLevelClient(
-                RestClient.builder(
-                        new HttpHost("localhost", 9200, "http")
-                )
-        );
+    public RestClient restClient() {
+        // 解析URI，支持多个地址（逗号分隔）
+        String[] uris = elasticsearchUris.split(",");
+        HttpHost[] hosts = new HttpHost[uris.length];
+        for (int i = 0; i < uris.length; i++) {
+            String uri = uris[i].trim();
+            if (uri.startsWith("http://")) {
+                uri = uri.substring(7);
+            } else if (uri.startsWith("https://")) {
+                uri = uri.substring(8);
+            }
+            String[] parts = uri.split(":");
+            String host = parts[0];
+            int port = parts.length > 1 ? Integer.parseInt(parts[1]) : 9200;
+            String scheme = elasticsearchUris.contains("https://") ? "https" : "http";
+            hosts[i] = new HttpHost(host, port, scheme);
+        }
+        return RestClient.builder(hosts).build();
+    }
+
+    @Bean
+    public ElasticsearchTransport elasticsearchTransport(RestClient restClient) {
+        // 使用Jackson作为JSON映射器
+        return new RestClientTransport(restClient, new JacksonJsonpMapper(new ObjectMapper()));
+    }
+
+    @Bean
+    public ElasticsearchClient elasticsearchClient(ElasticsearchTransport transport) {
+        return new ElasticsearchClient(transport);
     }
 }
-

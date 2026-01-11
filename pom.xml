@@ -91,6 +91,18 @@
                 <artifactId>elasticsearch-rest-high-level-client</artifactId>
                 <version>${elasticsearch.version}</version>
             </dependency>
+            <!-- Elasticsearch Java Client (新版本API) -->
+            <dependency>
+                <groupId>co.elastic.clients</groupId>
+                <artifactId>elasticsearch-java</artifactId>
+                <version>${elasticsearch.version}</version>
+            </dependency>
+            <!-- Elasticsearch Rest Client (新客户端需要) -->
+            <dependency>
+                <groupId>org.elasticsearch.client</groupId>
+                <artifactId>elasticsearch-rest-client</artifactId>
+                <version>${elasticsearch.version}</version>
+            </dependency>
             <!-- Zipkin 和 Sentinel 的版本由 Spring Cloud BOM 和 Spring Cloud Alibaba BOM 自动管理 -->
         </dependencies>
     </dependencyManagement>
