@@ -1,29 +1,32 @@
 package com.wuzuhao.cpm.user.controller;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.wuzuhao.cpm.common.Result;
 import com.wuzuhao.cpm.user.dto.excel.UserExcelDTO;
 import com.wuzuhao.cpm.user.entity.User;
 import com.wuzuhao.cpm.user.service.ExcelExportService;
 import com.wuzuhao.cpm.user.feign.NotificationServiceClient;
+import com.wuzuhao.cpm.user.feign.SearchServiceClient;
 import com.wuzuhao.cpm.user.service.UserService;
 import com.wuzuhao.cpm.util.ExcelUtil;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
 /**
  * 用户控制器
  */
+@Slf4j
 @Api(tags = "用户管理")
 @RestController
 @RequestMapping("/user")
@@ -38,6 +41,10 @@ public class UserController {
     @Autowired
     @Lazy
     private NotificationServiceClient notificationServiceClient;
+
+    @Autowired
+    @Lazy
+    private SearchServiceClient searchServiceClient;
 
     /**
      * 用户注册
@@ -73,6 +80,9 @@ public class UserController {
         Long userId = (Long) request.getAttribute("userId");
         user.setId(userId);
         user.setPassword(null); // 不允许通过此接口修改密码
+        // 清除时间字段，让 MyBatis-Plus 自动填充
+        user.setCreateTime(null);
+        user.setUpdateTime(null);
         userService.updateUser(user);
         return Result.success("更新成功");
     }
@@ -179,28 +189,136 @@ public class UserController {
     }
 
     /**
-     * 分页查询用户列表（管理员）
+     * 获取所有用户列表（用于索引同步）
      */
-    @ApiOperation(value = "分页查询用户列表", notes = "管理员功能，分页查询所有用户")
+    @ApiOperation(value = "获取所有用户列表", notes = "获取所有用户信息，用于搜索服务索引同步")
+    @GetMapping("/all")
+    public Result<List<User>> getAllUsers() {
+        List<User> users = userService.list();
+        // 清除密码
+        users.forEach(u -> u.setPassword(null));
+        return Result.success(users);
+    }
+
+    /**
+     * 分页查询用户列表（管理员，使用Elasticsearch全文检索）
+     */
+    @ApiOperation(value = "分页查询用户列表", notes = "管理员功能，使用Elasticsearch全文检索查询用户信息")
     @GetMapping("/list")
     public Result<Page<User>> getUserList(
             @ApiParam(value = "当前页码", example = "1") @RequestParam(defaultValue = "1") Integer current,
             @ApiParam(value = "每页数量", example = "10") @RequestParam(defaultValue = "10") Integer size,
             @ApiParam(value = "用户名（模糊查询）") @RequestParam(required = false) String username,
             @ApiParam(value = "角色") @RequestParam(required = false) String role) {
+        try {
+            // 合并查询参数为keyword
+            StringBuilder keywordBuilder = new StringBuilder();
+            if (username != null && !username.trim().isEmpty()) {
+                keywordBuilder.append(username.trim());
+            }
+            
+            String keyword = keywordBuilder.length() > 0 ? keywordBuilder.toString() : "*";
+            
+            // 调用搜索服务（page参数从1开始，Elasticsearch从0开始，需要减1）
+            Result<Map<String, Object>> searchResult = searchServiceClient.searchUser(keyword, current - 1, size);
+            
+            if (searchResult == null || searchResult.getCode() != 200 || searchResult.getData() == null) {
+                // 如果搜索服务失败，返回空结果
+                Page<User> page = new Page<>(current, size);
+                page.setTotal(0);
+                return Result.success(page);
+            }
+            
+            Map<String, Object> data = searchResult.getData();
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> hits = (List<Map<String, Object>>) data.get("hits");
+            Long total = ((Number) data.get("total")).longValue();
+            
+            // 转换为User实体列表
+            List<User> users = new ArrayList<>();
+            if (hits != null) {
+                for (Map<String, Object> hit : hits) {
+                    try {
+                        // 过滤已删除的数据
+                        Object deletedObj = hit.get("deleted");
+                        if (deletedObj != null) {
+                            int deleted = deletedObj instanceof Number ? 
+                                ((Number) deletedObj).intValue() : 
+                                Integer.parseInt(deletedObj.toString());
+                            if (deleted == 1) {
+                                continue; // 跳过已删除的数据
+                            }
+                        }
+                        User user = convertMapToUser(hit);
+                        // 如果指定了role参数，进行过滤
+                        if (role != null && !role.isEmpty() && user.getRole() != null && !user.getRole().equals(role)) {
+                            continue;
+                        }
+                        users.add(user);
+                    } catch (Exception e) {
+                        // 忽略转换失败的数据
+                        continue;
+                    }
+                }
+            }
+            
+            // 构建Page对象
+            Page<User> page = new Page<>(current, size);
+            page.setTotal(total);
+            page.setRecords(users);
+            return Result.success(page);
+            
+        } catch (Exception e) {
+            log.error("搜索用户信息失败", e);
+            // 如果搜索服务异常，返回空结果
         Page<User> page = new Page<>(current, size);
-        LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<>();
-        if (username != null && !username.isEmpty()) {
-            wrapper.like(User::getUsername, username);
+            page.setTotal(0);
+            return Result.success(page);
         }
-        if (role != null && !role.isEmpty()) {
-            wrapper.eq(User::getRole, role);
+    }
+
+    /**
+     * 将Map转换为User对象
+     */
+    private User convertMapToUser(Map<String, Object> map) {
+        User user = new User();
+        if (map.get("id") != null) {
+            user.setId(Long.valueOf(map.get("id").toString()));
         }
-        wrapper.orderByDesc(User::getCreateTime);
-        Page<User> result = userService.page(page, wrapper);
-        // 清除密码
-        result.getRecords().forEach(u -> u.setPassword(null));
-        return Result.success(result);
+        user.setUsername((String) map.get("username"));
+        user.setRealName((String) map.get("realName"));
+        user.setPhone((String) map.get("phone"));
+        user.setEmail((String) map.get("email"));
+        user.setAvatar((String) map.get("avatar"));
+        user.setRole((String) map.get("role"));
+        if (map.get("status") != null) {
+            user.setStatus(Integer.valueOf(map.get("status").toString()));
+        }
+        
+        // 使用 DateTimeFormatter 指定日期格式 "yyyy-MM-dd HH:mm:ss"
+        java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+        
+        if (map.get("createTime") != null) {
+            try {
+                String createTimeStr = map.get("createTime").toString();
+                user.setCreateTime(java.time.LocalDateTime.parse(createTimeStr, formatter));
+                log.debug("成功解析用户 createTime: {}", createTimeStr);
+            } catch (Exception e) {
+                log.warn("解析用户 createTime 失败: {}, 错误: {}", map.get("createTime"), e.getMessage());
+                // 忽略日期解析错误，继续处理其他字段
+            }
+        }
+        if (map.get("updateTime") != null) {
+            try {
+                String updateTimeStr = map.get("updateTime").toString();
+                user.setUpdateTime(java.time.LocalDateTime.parse(updateTimeStr, formatter));
+                log.debug("成功解析用户 updateTime: {}", updateTimeStr);
+            } catch (Exception e) {
+                log.warn("解析用户 updateTime 失败: {}, 错误: {}", map.get("updateTime"), e.getMessage());
+                // 忽略日期解析错误，继续处理其他字段
+            }
+        }
+        return user;
     }
 
     /**
@@ -229,8 +347,17 @@ public class UserController {
             return Result.error("用户不存在");
         }
         user.setStatus(params.get("status"));
-        userService.updateUser(user);
-        return Result.success("状态更新成功");
+        // 清除时间字段，让 MyBatis-Plus 自动填充
+        user.setCreateTime(null);
+        user.setUpdateTime(null);
+        // 直接调用 updateById，避免触发手机号和邮箱的重复检查
+        // updateById 会发送 ES 同步消息
+        boolean result = userService.updateById(user);
+        if (result) {
+            return Result.success("状态更新成功");
+        } else {
+            return Result.error("状态更新失败");
+        }
     }
 
     /**
@@ -247,6 +374,9 @@ public class UserController {
         }
         user.setId(id);
         user.setPassword(null); // 不允许通过此接口修改密码
+        // 清除时间字段，让 MyBatis-Plus 自动填充
+        user.setCreateTime(null);
+        user.setUpdateTime(null);
         userService.updateUser(user);
         return Result.success("更新成功");
     }

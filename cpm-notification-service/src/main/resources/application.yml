@@ -18,9 +18,11 @@ spring:
         server-addr: ${SPRING_CLOUD_NACOS_CONFIG_SERVER_ADDR:localhost:8848}
         namespace: ${SPRING_CLOUD_NACOS_CONFIG_NAMESPACE:}
         file-extension: yml
+        import-check:
+          enabled: false
     sentinel:
       transport:
-        dashboard: ${SENTINEL_DASHBOARD:http://sentinel:8858}
+        dashboard: ${SENTINEL_DASHBOARD:http://localhost:8858}
         port: 8719
       # 流控规则配置
       flow:
@@ -60,7 +62,7 @@ spring:
   # Zipkin 分布式追踪配置
   sleuth:
     zipkin:
-      base-url: ${ZIPKIN_BASE_URL:http://zipkin:9411}
+      base-url: ${ZIPKIN_BASE_URL:http://localhost:9411}
     sampler:
       probability: 1.0  # 采样率，1.0 表示 100% 采样
 
@@ -72,6 +74,12 @@ jwt:
 # Knife4j配置
 knife4j:
   enable: true
+
+# 限流配置
+cpm:
+  rate-limit:
+    enabled: false  # 是否启用限流，测试时可以设置为 false 来禁用所有限流
+    max-requests-per-minute: 180  # 每分钟最大请求数
   openapi:
     title: 通知服务API文档
     description: 通知服务接口文档

@@ -2,6 +2,7 @@ package com.wuzuhao.cpm.interceptor;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wuzuhao.cpm.common.Result;
+import com.wuzuhao.cpm.config.RateLimitProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,12 +34,19 @@ public class RateLimitInterceptor implements HandlerInterceptor {
     @NonNull
     private ObjectMapper objectMapper;
 
-    // 限流配置
-    private static final int MAX_REQUESTS_PER_MINUTE = 60; // 每分钟最大请求数
+    @Autowired
+    @NonNull
+    private RateLimitProperties rateLimitProperties;
+
     private static final String RATE_LIMIT_PREFIX = "rate_limit:";
 
     @Override
     public boolean preHandle(@NonNull HttpServletRequest request, @NonNull HttpServletResponse response, @NonNull Object handler) throws Exception {
+        // 如果限流被禁用，直接放行
+        if (!rateLimitProperties.isEnabled()) {
+            return true;
+        }
+
         try {
             // 获取客户端IP
             String clientIp = getClientIp(request);
@@ -55,7 +63,8 @@ public class RateLimitInterceptor implements HandlerInterceptor {
             }
 
             // 检查是否超过限制
-            if (count >= MAX_REQUESTS_PER_MINUTE) {
+            int maxRequests = rateLimitProperties.getMaxRequestsPerMinute();
+            if (count >= maxRequests) {
                 log.warn("IP {} 请求过于频繁，已限流", clientIp);
                 sendErrorResponse(response, "请求过于频繁，请稍后再试");
                 return false;

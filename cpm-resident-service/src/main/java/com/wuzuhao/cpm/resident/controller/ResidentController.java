@@ -1,10 +1,10 @@
 package com.wuzuhao.cpm.resident.controller;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.wuzuhao.cpm.common.Result;
 import com.wuzuhao.cpm.resident.dto.excel.ResidentExcelDTO;
 import com.wuzuhao.cpm.resident.entity.Resident;
+import com.wuzuhao.cpm.resident.feign.SearchServiceClient;
 import com.wuzuhao.cpm.resident.feign.UserServiceClient;
 import com.wuzuhao.cpm.resident.service.ExcelExportService;
 import com.wuzuhao.cpm.resident.service.ResidentService;
@@ -13,12 +13,14 @@ import com.wuzuhao.cpm.util.ValidationUtil;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -26,6 +28,7 @@ import java.util.Map;
 /**
  * 居民控制器
  */
+@Slf4j
 @Api(tags = "居民管理")
 @RestController
 @RequestMapping("/resident")
@@ -36,6 +39,9 @@ public class ResidentController {
 
     @Autowired
     private UserServiceClient userServiceClient;
+
+    @Autowired
+    private SearchServiceClient searchServiceClient;
 
     @Autowired
     private ExcelExportService excelExportService;
@@ -156,6 +162,9 @@ public class ResidentController {
 
         resident.setId(id);
         resident.setUserId(existResident.getUserId());
+        // 清除时间字段，让 MyBatis-Plus 自动填充
+        resident.setCreateTime(null);
+        resident.setUpdateTime(null);
         residentService.updateById(resident);
         return Result.success("更新成功");
     }
@@ -171,6 +180,9 @@ public class ResidentController {
         if (existResident != null) {
             resident.setId(existResident.getId());
             resident.setUserId(userId);
+            // 清除时间字段，让 MyBatis-Plus 自动填充
+            resident.setCreateTime(null);
+            resident.setUpdateTime(null);
             residentService.updateById(resident);
             return Result.success("更新成功");
         }
@@ -178,9 +190,9 @@ public class ResidentController {
     }
 
     /**
-     * 分页查询居民列表
+     * 分页查询居民列表（使用Elasticsearch全文检索）
      */
-    @ApiOperation(value = "分页查询居民列表", notes = "分页查询所有居民信息")
+    @ApiOperation(value = "分页查询居民列表", notes = "使用Elasticsearch全文检索查询居民信息")
     @GetMapping("/list")
     public Result<Page<Resident>> getResidentList(
             @ApiParam(value = "当前页码", example = "1") @RequestParam(defaultValue = "1") Integer current,
@@ -188,20 +200,136 @@ public class ResidentController {
             @ApiParam(value = "真实姓名（模糊查询）") @RequestParam(required = false) String realName,
             @ApiParam(value = "身份证号（模糊查询）") @RequestParam(required = false) String idCard,
             @ApiParam(value = "现居住地址（模糊查询）") @RequestParam(required = false) String currentAddress) {
-        Page<Resident> page = new Page<>(current, size);
-        LambdaQueryWrapper<Resident> wrapper = new LambdaQueryWrapper<>();
-        if (realName != null && !realName.isEmpty()) {
-            wrapper.like(Resident::getRealName, realName);
+        try {
+            // 合并查询参数为keyword
+            StringBuilder keywordBuilder = new StringBuilder();
+            if (realName != null && !realName.trim().isEmpty()) {
+                keywordBuilder.append(realName.trim());
+            }
+            if (idCard != null && !idCard.trim().isEmpty()) {
+                if (keywordBuilder.length() > 0) {
+                    keywordBuilder.append(" ");
+                }
+                keywordBuilder.append(idCard.trim());
+            }
+            if (currentAddress != null && !currentAddress.trim().isEmpty()) {
+                if (keywordBuilder.length() > 0) {
+                    keywordBuilder.append(" ");
+                }
+                keywordBuilder.append(currentAddress.trim());
+            }
+            
+            String keyword = keywordBuilder.length() > 0 ? keywordBuilder.toString() : "*";
+            
+            // 调用搜索服务（page参数从1开始，Elasticsearch从0开始，需要减1）
+            Result<Map<String, Object>> searchResult = searchServiceClient.searchResident(keyword, current - 1, size);
+            
+            if (searchResult == null || searchResult.getCode() != 200 || searchResult.getData() == null) {
+                // 如果搜索服务失败，返回空结果
+                Page<Resident> page = new Page<>(current, size);
+                page.setTotal(0);
+                return Result.success(page);
+            }
+            
+            Map<String, Object> data = searchResult.getData();
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> hits = (List<Map<String, Object>>) data.get("hits");
+            Long total = ((Number) data.get("total")).longValue();
+            
+            // 转换为Resident实体列表
+            List<Resident> residents = new ArrayList<>();
+            if (hits != null) {
+                for (Map<String, Object> hit : hits) {
+                    try {
+                        Resident resident = convertMapToResident(hit);
+                        residents.add(resident);
+                    } catch (Exception e) {
+                        // 忽略转换失败的数据
+                        continue;
+                    }
+                }
+            }
+            
+            // 构建Page对象
+            Page<Resident> page = new Page<>(current, size);
+            page.setTotal(total);
+            page.setRecords(residents);
+            return Result.success(page);
+            
+        } catch (Exception e) {
+            log.error("搜索居民信息失败", e);
+            // 如果搜索服务异常，返回空结果
+            Page<Resident> page = new Page<>(current, size);
+            page.setTotal(0);
+            return Result.success(page);
         }
-        if (idCard != null && !idCard.isEmpty()) {
-            wrapper.like(Resident::getIdCard, idCard);
+    }
+    
+    /**
+     * 将Map转换为Resident实体
+     */
+    private Resident convertMapToResident(Map<String, Object> map) {
+        Resident resident = new Resident();
+        if (map.get("id") != null) {
+            resident.setId(Long.valueOf(map.get("id").toString()));
         }
-        if (currentAddress != null && !currentAddress.isEmpty()) {
-            wrapper.like(Resident::getCurrentAddress, currentAddress);
+        if (map.get("userId") != null) {
+            resident.setUserId(Long.valueOf(map.get("userId").toString()));
         }
-        wrapper.orderByDesc(Resident::getCreateTime);
-        Page<Resident> result = residentService.page(page, wrapper);
-        return Result.success(result);
+        resident.setRealName((String) map.get("realName"));
+        resident.setIdCard((String) map.get("idCard"));
+        if (map.get("gender") != null) {
+            resident.setGender(Integer.valueOf(map.get("gender").toString()));
+        }
+        // 日期格式：birthDate 使用 "yyyy-MM-dd"，createTime/updateTime 使用 "yyyy-MM-dd HH:mm:ss"
+        java.time.format.DateTimeFormatter dateFormatter = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd");
+        java.time.format.DateTimeFormatter dateTimeFormatter = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+        
+        if (map.get("birthDate") != null) {
+            try {
+                String birthDateStr = map.get("birthDate").toString();
+                resident.setBirthDate(java.time.LocalDate.parse(birthDateStr, dateFormatter));
+                log.debug("成功解析居民 birthDate: {}", birthDateStr);
+            } catch (Exception e) {
+                log.warn("解析居民 birthDate 失败: {}, 错误: {}", map.get("birthDate"), e.getMessage());
+                // 忽略日期解析错误，继续处理其他字段
+            }
+        }
+        resident.setNationality((String) map.get("nationality"));
+        resident.setRegisteredAddress((String) map.get("registeredAddress"));
+        resident.setCurrentAddress((String) map.get("currentAddress"));
+        resident.setOccupation((String) map.get("occupation"));
+        resident.setEducation((String) map.get("education"));
+        if (map.get("maritalStatus") != null) {
+            resident.setMaritalStatus(Integer.valueOf(map.get("maritalStatus").toString()));
+        }
+        resident.setContactPhone((String) map.get("contactPhone"));
+        resident.setEmergencyContact((String) map.get("emergencyContact"));
+        resident.setEmergencyPhone((String) map.get("emergencyPhone"));
+        resident.setRemark((String) map.get("remark"));
+        resident.setAvatar((String) map.get("avatar"));
+        resident.setIdCardPhoto((String) map.get("idCardPhoto"));
+        if (map.get("createTime") != null) {
+            try {
+                String createTimeStr = map.get("createTime").toString();
+                resident.setCreateTime(java.time.LocalDateTime.parse(createTimeStr, dateTimeFormatter));
+                log.debug("成功解析居民 createTime: {}", createTimeStr);
+            } catch (Exception e) {
+                log.warn("解析居民 createTime 失败: {}, 错误: {}", map.get("createTime"), e.getMessage());
+                // 忽略日期解析错误，继续处理其他字段
+            }
+        }
+        if (map.get("updateTime") != null) {
+            try {
+                String updateTimeStr = map.get("updateTime").toString();
+                resident.setUpdateTime(java.time.LocalDateTime.parse(updateTimeStr, dateTimeFormatter));
+                log.debug("成功解析居民 updateTime: {}", updateTimeStr);
+            } catch (Exception e) {
+                log.warn("解析居民 updateTime 失败: {}, 错误: {}", map.get("updateTime"), e.getMessage());
+                // 忽略日期解析错误，继续处理其他字段
+            }
+        }
+        return resident;
     }
 
     /**

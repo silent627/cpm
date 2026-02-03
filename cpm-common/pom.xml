@@ -67,5 +67,18 @@
             <optional>true</optional>
         </dependency>
     </dependencies>
+    
+    <build>
+        <plugins>
+            <!-- 禁用 spring-boot-maven-plugin 的 repackage，因为这是库模块，不是可执行应用 -->
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <skip>true</skip>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
 </project>
 

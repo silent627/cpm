@@ -63,7 +63,7 @@ public class StatisticsServiceImpl implements StatisticsService {
                             residents.add((Map<String, Object>) item);
                         }
                     }
-                    log.info("成功获取居民列表，数量: {}", residents.size());
+                    log.debug("成功获取居民列表，数量: {}", residents.size());
                     return residents;
                 } else {
                     log.warn("居民服务返回的数据格式不正确: {}", data.getClass().getName());
@@ -96,7 +96,7 @@ public class StatisticsServiceImpl implements StatisticsService {
                             households.add((Map<String, Object>) item);
                         }
                     }
-                    log.info("成功获取户籍列表，数量: {}", households.size());
+                    log.debug("成功获取户籍列表，数量: {}", households.size());
                     return households;
                 } else {
                     log.warn("户籍服务返回的数据格式不正确: {}", data.getClass().getName());

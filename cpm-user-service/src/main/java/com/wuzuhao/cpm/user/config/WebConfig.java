@@ -1,6 +1,7 @@
 package com.wuzuhao.cpm.user.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.wuzuhao.cpm.config.RateLimitProperties;
 import com.wuzuhao.cpm.interceptor.RateLimitInterceptor;
 import com.wuzuhao.cpm.user.interceptor.AuthInterceptor;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,6 +27,9 @@ public class WebConfig implements WebMvcConfigurer {
     private RateLimitInterceptor rateLimitInterceptor;
 
     @Autowired
+    private RateLimitProperties rateLimitProperties;
+
+    @Autowired
     private ObjectMapper objectMapper;
 
     /**
@@ -43,24 +47,28 @@ public class WebConfig implements WebMvcConfigurer {
      */
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
-        // 限流拦截器（先执行）
-        registry.addInterceptor(rateLimitInterceptor)
-                .addPathPatterns("/**")
-                .excludePathPatterns(
-                        "/auth/login",
-                        "/auth/register",
-                        "/auth/forget-password/**",
-                        "/user/register",
-                        "/captcha/**",
-                        "/region/**",  // 排除区划API，避免级联选择时触发限流
-                        "/doc.html",
-                        "/swagger-ui.html",
-                        "/swagger-ui/**",
-                        "/v2/api-docs",
-                        "/swagger-resources/**",
-                        "/webjars/**"
-                )
-                .order(1);
+        // 限流拦截器（先执行）- 根据配置决定是否启用
+        if (rateLimitProperties.isEnabled()) {
+            registry.addInterceptor(rateLimitInterceptor)
+                    .addPathPatterns("/**")
+                    .excludePathPatterns(
+                            "/auth/login",
+                            "/auth/register",
+                            "/auth/forget-password/**",
+                            "/user/register",
+                            "/user/all",  // 排除索引同步接口，避免性能测试时触发限流
+                            "/admin/all",  // 排除索引同步接口
+                            "/captcha/**",
+                            "/region/**",  // 排除区划API，避免级联选择时触发限流
+                            "/doc.html",
+                            "/swagger-ui.html",
+                            "/swagger-ui/**",
+                            "/v2/api-docs",
+                            "/swagger-resources/**",
+                            "/webjars/**"
+                    )
+                    .order(1);
+        }
         
         // 认证拦截器
         registry.addInterceptor(authInterceptor)
@@ -70,6 +78,8 @@ public class WebConfig implements WebMvcConfigurer {
                         "/auth/register",
                         "/auth/forget-password/**",
                         "/user/register",
+                        "/user/all",  // 排除索引同步接口
+                        "/admin/all",  // 排除索引同步接口
                         "/captcha/**",
                         "/region/**",
                         "/doc.html",

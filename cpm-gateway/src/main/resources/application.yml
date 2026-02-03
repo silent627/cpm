@@ -15,6 +15,8 @@ spring:
         server-addr: ${SPRING_CLOUD_NACOS_CONFIG_SERVER_ADDR:localhost:8848}
         namespace: ${SPRING_CLOUD_NACOS_CONFIG_NAMESPACE:}
         file-extension: yml
+        import-check:
+          enabled: false
     gateway:
       discovery:
         locator:
@@ -112,6 +114,13 @@ spring:
             - Path=/api/upload/**
           filters:
             - StripPrefix=1
+        # Swagger 文档路由 - 转发到用户服务（Knife4j 聚合文档）
+        - id: swagger-resources
+          uri: lb://cpm-user-service
+          predicates:
+            - Path=/swagger-resources/**,/v2/api-docs/**,/v3/api-docs/**,/doc.html,/swagger-ui.html,/swagger-ui/**,/webjars/**
+          filters:
+            - StripPrefix=0
       globalcors:
         cors-configurations:
           '[/**]':
@@ -123,20 +132,26 @@ spring:
   # Zipkin 分布式追踪配置
   sleuth:
     zipkin:
-      base-url: ${ZIPKIN_BASE_URL:http://zipkin:9411}
+      base-url: ${ZIPKIN_BASE_URL:http://localhost:9411}
     sampler:
       probability: 1.0  # 采样率，1.0 表示 100% 采样
   # Sentinel 流量控制配置
   sentinel:
     transport:
-      dashboard: ${SENTINEL_DASHBOARD:http://sentinel:8858}
+      dashboard: ${SENTINEL_DASHBOARD:http://localhost:8858}
       port: 8719
     # 流控规则配置
     flow:
-      enabled: true
+      enabled: ${SENTINEL_FLOW_ENABLED:false}  # 是否启用Sentinel流控，测试时可以设置为 false 来禁用
     # 熔断降级配置
     degrade:
       enabled: true
+
+# 限流配置
+cpm:
+  rate-limit:
+    enabled: false  # 是否启用限流，测试时可以设置为 false 来禁用所有限流
+    max-requests-per-minute: 180  # 每分钟最大请求数
 
 # Knife4j配置
 knife4j:
@@ -145,4 +160,4 @@ knife4j:
     strategy: discover
     discover:
       enabled: true
-      version: 3.0.3
+      version: swagger2

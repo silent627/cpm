@@ -2,6 +2,7 @@ package com.wuzuhao.cpm.config;
 
 import feign.Logger;
 import feign.Request;
+import feign.RequestInterceptor;
 import feign.Retryer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -56,6 +57,15 @@ public class FeignConfig {
                 1000,     // 最大重试间隔：1秒
                 3         // 最大重试次数：3次（总共尝试4次）
         );
+    }
+
+    /**
+     * 配置Feign请求拦截器
+     * 用于将当前请求的Token传递给Feign调用
+     */
+    @Bean
+    public RequestInterceptor feignRequestInterceptor() {
+        return new FeignRequestInterceptor();
     }
 }
 

@@ -1,6 +1,7 @@
 package com.wuzuhao.cpm.resident.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.wuzuhao.cpm.config.RateLimitProperties;
 import com.wuzuhao.cpm.interceptor.RateLimitInterceptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Configuration;
@@ -22,6 +23,9 @@ public class WebConfig implements WebMvcConfigurer {
     private RateLimitInterceptor rateLimitInterceptor;
 
     @Autowired
+    private RateLimitProperties rateLimitProperties;
+
+    @Autowired
     private ObjectMapper objectMapper;
 
     /**
@@ -39,18 +43,21 @@ public class WebConfig implements WebMvcConfigurer {
      */
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
-        // 限流拦截器
-        registry.addInterceptor(rateLimitInterceptor)
-                .addPathPatterns("/**")
-                .excludePathPatterns(
-                        "/doc.html",
-                        "/swagger-ui.html",
-                        "/swagger-ui/**",
-                        "/v2/api-docs",
-                        "/swagger-resources/**",
-                        "/webjars/**"
-                )
-                .order(1);
+        // 限流拦截器 - 根据配置决定是否启用
+        if (rateLimitProperties.isEnabled()) {
+            registry.addInterceptor(rateLimitInterceptor)
+                    .addPathPatterns("/**")
+                    .excludePathPatterns(
+                            "/resident/all",  // 排除索引同步接口，避免性能测试时触发限流
+                            "/doc.html",
+                            "/swagger-ui.html",
+                            "/swagger-ui/**",
+                            "/v2/api-docs",
+                            "/swagger-resources/**",
+                            "/webjars/**"
+                    )
+                    .order(1);
+        }
     }
 
     /**

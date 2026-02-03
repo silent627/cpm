@@ -14,5 +14,5 @@ public interface ResidentServiceClient {
      * 获取所有居民列表（用于索引同步）
      */
     @GetMapping("/all")
-    Result<Object> getAllResidents();
+    Result<?> getAllResidents();
 }

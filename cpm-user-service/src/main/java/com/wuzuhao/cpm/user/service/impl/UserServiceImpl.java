@@ -5,15 +5,22 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.wuzuhao.cpm.user.entity.User;
 import com.wuzuhao.cpm.user.mapper.UserMapper;
 import com.wuzuhao.cpm.user.feign.FileServiceClient;
+import com.wuzuhao.cpm.common.dto.ESSyncMessage;
+import com.wuzuhao.cpm.config.RabbitMQConfig;
 import com.wuzuhao.cpm.user.service.UserService;
 import com.wuzuhao.cpm.util.RedisUtil;
 import com.wuzuhao.cpm.util.ValidationUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.util.DigestUtils;
+
+import java.time.format.DateTimeFormatter;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * 用户服务实现类
@@ -33,6 +40,9 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     @Autowired
     @Lazy
     private FileServiceClient fileServiceClient;
+
+    @Autowired
+    private RabbitTemplate rabbitTemplate;
 
     private static final Logger log = LoggerFactory.getLogger(UserServiceImpl.class);
 
@@ -161,6 +171,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         this.save(user);
         // 注册后清除相关缓存（虽然新数据可能不在缓存中，但为了保持一致性）
         clearUserCache(user);
+        // 发送 ES 同步消息
+        sendESSyncMessage(ESSyncMessage.create("user_index", user.getId(), convertToMap(user)));
         return user;
     }
 
@@ -242,8 +254,56 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         if (result) {
             clearUserCache(oldUser);
             clearUserCache(user);
+            // 发送 ES 同步消息
+            sendESSyncMessage(ESSyncMessage.update("user_index", user.getId(), convertToMap(user)));
         }
         return result;
+    }
+    
+    /**
+     * 发送 ES 同步消息
+     */
+    private void sendESSyncMessage(ESSyncMessage message) {
+        try {
+            log.debug("发送 ES 同步消息，operation: {}, index: {}, id: {}", 
+                message != null ? message.getOperation() : "null",
+                message != null ? message.getIndex() : "null",
+                message != null ? message.getId() : "null");
+            rabbitTemplate.convertAndSend(
+                RabbitMQConfig.USER_SYNC_EXCHANGE,
+                RabbitMQConfig.USER_SYNC_ROUTING_KEY,
+                message
+            );
+            log.debug("ES 同步消息发送成功");
+        } catch (Exception e) {
+            log.error("发送 ES 同步消息失败: {}", e.getMessage(), e);
+        }
+    }
+    
+    /**
+     * 将 User 对象转换为 Map
+     */
+    private Map<String, Object> convertToMap(User user) {
+        Map<String, Object> map = new HashMap<>();
+        if (user != null) {
+            map.put("id", user.getId());
+            map.put("username", user.getUsername());
+            map.put("realName", user.getRealName());
+            map.put("phone", user.getPhone());
+            map.put("email", user.getEmail());
+            map.put("avatar", user.getAvatar());
+            map.put("role", user.getRole());
+            map.put("status", user.getStatus());
+            // 将 LocalDateTime 转换为字符串格式（yyyy-MM-dd HH:mm:ss），以便前端正确显示
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+            if (user.getCreateTime() != null) {
+                map.put("createTime", user.getCreateTime().format(formatter));
+            }
+            if (user.getUpdateTime() != null) {
+                map.put("updateTime", user.getUpdateTime().format(formatter));
+            }
+        }
+        return map;
     }
 
     @Override
@@ -307,12 +367,26 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         return result;
     }
 
-    public boolean removeById(Long id) {
+    @Override
+    public boolean removeById(java.io.Serializable id) {
+        Long userId = id instanceof Long ? (Long) id : Long.valueOf(id.toString());
+        log.info("开始删除用户，id: {}", userId);
         // 删除前获取数据，用于清除缓存
-        User user = super.getById(id);
+        User user = super.getById(userId);
+        if (user == null) {
+            log.warn("要删除的用户不存在，id: {}", userId);
+            return false;
+        }
         boolean result = super.removeById(id);
+        log.info("数据库删除操作完成，id: {}, 结果: {}", userId, result);
         if (result) {
             clearUserCache(user);
+            // 发送 ES 同步消息
+            log.info("用户删除成功，准备发送 ES 删除消息，id: {}", userId);
+            sendESSyncMessage(ESSyncMessage.delete("user_index", userId));
+            log.info("ES 删除消息已发送，id: {}", userId);
+        } else {
+            log.warn("数据库删除失败，id: {}", userId);
         }
         return result;
     }

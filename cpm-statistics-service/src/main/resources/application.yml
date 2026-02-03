@@ -17,6 +17,8 @@ spring:
       config:
         server-addr: localhost:8848
         file-extension: yml
+        import-check:
+          enabled: false
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://localhost:3306/cpm_db?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
@@ -42,13 +44,13 @@ spring:
   # Zipkin 分布式追踪配置
   sleuth:
     zipkin:
-      base-url: ${ZIPKIN_BASE_URL:http://zipkin:9411}
+      base-url: ${ZIPKIN_BASE_URL:http://localhost:9411}
     sampler:
       probability: 1.0  # 采样率，1.0 表示 100% 采样
   # Sentinel 流量控制配置
   sentinel:
     transport:
-      dashboard: ${SENTINEL_DASHBOARD:http://sentinel:8858}
+      dashboard: ${SENTINEL_DASHBOARD:http://localhost:8858}
       port: 8719
     # 流控规则配置
     flow:
@@ -77,3 +79,9 @@ jwt:
 knife4j:
   enable: true
   production: false
+
+# 限流配置
+cpm:
+  rate-limit:
+    enabled: false  # 是否启用限流，测试时可以设置为 false 来禁用所有限流
+    max-requests-per-minute: 180  # 每分钟最大请求数
