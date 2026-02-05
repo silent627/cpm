@@ -1,0 +1,15 @@
+[2026-02-03T01:30:00,057][INFO ][o.e.x.m.MlDailyMaintenanceService] [DESKTOP-HN9P4S1] triggering scheduled [ML] maintenance tasks
+[2026-02-03T01:30:01,483][INFO ][o.e.x.m.a.TransportDeleteExpiredDataAction] [DESKTOP-HN9P4S1] Deleting expired data
+[2026-02-03T01:30:02,767][INFO ][o.e.x.m.j.r.UnusedStatsRemover] [DESKTOP-HN9P4S1] Successfully deleted [0] unused stats documents
+[2026-02-03T01:30:02,783][INFO ][o.e.x.m.a.TransportDeleteExpiredDataAction] [DESKTOP-HN9P4S1] Completed deletion of expired ML data
+[2026-02-03T01:30:02,783][INFO ][o.e.x.m.MlDailyMaintenanceService] [DESKTOP-HN9P4S1] Successfully completed [ML] maintenance task: triggerDeleteExpiredDataTask
+[2026-02-03T09:30:00,282][INFO ][o.e.x.s.SnapshotRetentionTask] [DESKTOP-HN9P4S1] starting SLM retention snapshot cleanup task
+[2026-02-03T09:30:00,334][INFO ][o.e.x.s.SnapshotRetentionTask] [DESKTOP-HN9P4S1] there are no repositories to fetch, SLM retention snapshot cleanup task complete
+[2026-02-03T13:54:00,785][INFO ][o.e.b.Bootstrap          ] [DESKTOP-HN9P4S1] running graceful exit on windows
+[2026-02-03T13:54:00,758][INFO ][o.e.x.m.p.NativeController] [DESKTOP-HN9P4S1] Native controller process has stopped - no new native processes can be started
+[2026-02-03T13:54:00,797][INFO ][o.e.n.Node               ] [DESKTOP-HN9P4S1] stopping ...
+[2026-02-03T13:54:01,030][INFO ][o.e.x.w.WatcherService   ] [DESKTOP-HN9P4S1] stopping watch service, reason [shutdown initiated]
+[2026-02-03T13:54:01,058][INFO ][o.e.x.w.WatcherLifeCycleService] [DESKTOP-HN9P4S1] watcher has stopped and shutdown
+[2026-02-03T13:54:01,876][INFO ][o.e.n.Node               ] [DESKTOP-HN9P4S1] stopped
+[2026-02-03T13:54:01,878][INFO ][o.e.n.Node               ] [DESKTOP-HN9P4S1] closing ...
+[2026-02-03T13:54:02,526][INFO ][o.e.n.Node               ] [DESKTOP-HN9P4S1] closed
