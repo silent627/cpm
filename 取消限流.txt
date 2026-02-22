@@ -1,0 +1,3 @@
+测试时完全禁用限流
+将所有服务的 cpm.rate-limit.enabled 设置为 false
+将 Gateway 的 spring.cloud.sentinel.flow.enabled 设置为 false

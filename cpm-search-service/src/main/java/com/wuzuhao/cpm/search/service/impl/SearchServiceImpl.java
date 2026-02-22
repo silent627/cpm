@@ -302,7 +302,7 @@ public class SearchServiceImpl implements SearchService, ESDocumentSyncService {
             }
             
             // 先尝试完全匹配查询（优先级最高）
-            String[] exactMatchFields = {"username", "realName.keyword", "phone", "email"};
+            String[] exactMatchFields = {"username.keyword", "realName.keyword", "phone", "email"};
             Map<String, Object> exactMatchResult = checkExactMatch(
                 ElasticsearchIndexUtil.USER_INDEX, 
                 exactMatchFields, 
@@ -1408,7 +1408,12 @@ public class SearchServiceImpl implements SearchService, ESDocumentSyncService {
                 )));
             }
             
-            Query exactMatchQuery = Query.of(q -> q.bool(exactMatchBuilder.build()));
+            // 设置 minimum_should_match 为 1，确保至少有一个 should 匹配时才返回结果
+            BoolQuery boolQuery = exactMatchBuilder
+                .minimumShouldMatch("1")
+                .build();
+            
+            Query exactMatchQuery = Query.of(q -> q.bool(boolQuery));
             
             // 按 id 升序排序，确保返回 id 最小的完全匹配结果
             SortOptions sortOptions = SortOptions.of(s -> s

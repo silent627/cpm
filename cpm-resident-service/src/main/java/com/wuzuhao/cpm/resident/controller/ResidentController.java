@@ -201,7 +201,161 @@ public class ResidentController {
             @ApiParam(value = "身份证号（模糊查询）") @RequestParam(required = false) String idCard,
             @ApiParam(value = "现居住地址（模糊查询）") @RequestParam(required = false) String currentAddress) {
         try {
-            // 合并查询参数为keyword
+            // 先检查每个字段的完全匹配，如果任何一个字段完全匹配，直接返回那一条记录
+            if (idCard != null && !idCard.trim().isEmpty()) {
+                // 检查身份证号是否完全匹配
+                Result<Map<String, Object>> exactMatchResult = searchServiceClient.searchResident(idCard.trim(), 0, 1);
+                if (exactMatchResult != null && exactMatchResult.getCode() == 200 && exactMatchResult.getData() != null) {
+                    Map<String, Object> data = exactMatchResult.getData();
+                    @SuppressWarnings("unchecked")
+                    List<Map<String, Object>> hits = (List<Map<String, Object>>) data.get("hits");
+                    if (hits != null && !hits.isEmpty()) {
+                        // 检查是否真的是完全匹配（检查身份证号字段）
+                        for (Map<String, Object> hit : hits) {
+                            String hitIdCard = (String) hit.get("idCard");
+                            if (idCard.trim().equals(hitIdCard)) {
+                                // 找到完全匹配的记录，只返回这一条
+                                List<Resident> residents = new ArrayList<>();
+                                Resident resident = convertMapToResident(hit);
+                                residents.add(resident);
+                                Page<Resident> page = new Page<>(current, size);
+                                page.setTotal(1L);
+                                page.setRecords(residents);
+                                return Result.success(page);
+                            }
+                        }
+                    }
+                }
+            }
+            
+            if (realName != null && !realName.trim().isEmpty()) {
+                // 检查真实姓名是否完全匹配（使用 keyword 字段）
+                Result<Map<String, Object>> exactMatchResult = searchServiceClient.searchResident(realName.trim(), 0, 1);
+                if (exactMatchResult != null && exactMatchResult.getCode() == 200 && exactMatchResult.getData() != null) {
+                    Map<String, Object> data = exactMatchResult.getData();
+                    @SuppressWarnings("unchecked")
+                    List<Map<String, Object>> hits = (List<Map<String, Object>>) data.get("hits");
+                    if (hits != null && !hits.isEmpty()) {
+                        // 检查是否真的是完全匹配（检查真实姓名字段）
+                        for (Map<String, Object> hit : hits) {
+                            String hitRealName = (String) hit.get("realName");
+                            if (realName.trim().equals(hitRealName)) {
+                                // 找到完全匹配的记录，只返回这一条
+                                List<Resident> residents = new ArrayList<>();
+                                Resident resident = convertMapToResident(hit);
+                                residents.add(resident);
+                                Page<Resident> page = new Page<>(current, size);
+                                page.setTotal(1L);
+                                page.setRecords(residents);
+                                return Result.success(page);
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // 如果只输入了地址字段，检查地址匹配（所有地址片段都在记录的地址字段中存在）
+            if (currentAddress != null && !currentAddress.trim().isEmpty() && 
+                (realName == null || realName.trim().isEmpty()) && 
+                (idCard == null || idCard.trim().isEmpty())) {
+                String addressInput = currentAddress.trim();
+                
+                // 检查输入的地址是否包含常见地名单位（省、市、区、县、街道、镇、村等）
+                // 如果都不包含，直接返回空结果
+                boolean containsLocationUnit = addressInput.matches(".*[省市区县街道镇乡村].*");
+                if (!containsLocationUnit) {
+                    // 如果输入的地址不包含任何常见地名单位，返回空结果
+                    Page<Resident> page = new Page<>(current, size);
+                    page.setTotal(0);
+                    page.setRecords(new ArrayList<>());
+                    return Result.success(page);
+                }
+                
+                // 只查询地址字段，检查地址匹配
+                Result<Map<String, Object>> addressMatchResult = searchServiceClient.searchResident(addressInput, 0, size);
+                if (addressMatchResult != null && addressMatchResult.getCode() == 200 && addressMatchResult.getData() != null) {
+                    Map<String, Object> data = addressMatchResult.getData();
+                    @SuppressWarnings("unchecked")
+                    List<Map<String, Object>> hits = (List<Map<String, Object>>) data.get("hits");
+                    if (hits != null && !hits.isEmpty()) {
+                        // 检查地址匹配：输入的地址字符串的所有部分都在记录的地址字段中存在
+                        // 对于中文地址，按常见的地名单位分割（省、市、区、县、街道、镇、村等）
+                        List<Resident> matchedResidents = new ArrayList<>();
+                        
+                        for (Map<String, Object> hit : hits) {
+                            String hitCurrentAddress = (String) hit.get("currentAddress");
+                            String hitRegisteredAddress = (String) hit.get("registeredAddress");
+                            
+                            // 检查所有地址片段是否在现居住地址或户籍地址中存在
+                            boolean allPartsMatch = false;
+                            
+                            // 检查现居住地址
+                            if (hitCurrentAddress != null && !hitCurrentAddress.trim().isEmpty()) {
+                                // 首先尝试直接包含匹配
+                                if (hitCurrentAddress.contains(addressInput)) {
+                                    allPartsMatch = true;
+                                } else {
+                                    // 如果直接包含不匹配，按常见地名单位分割地址，检查所有片段是否都存在
+                                    String[] addressParts = addressInput.split("(?=[省市区县街道镇乡村])|(?<=[省市区县街道镇乡村])");
+                                    boolean partsMatch = true;
+                                    for (String part : addressParts) {
+                                        String trimmedPart = part != null ? part.trim() : "";
+                                        if (!trimmedPart.isEmpty() && !hitCurrentAddress.contains(trimmedPart)) {
+                                            partsMatch = false;
+                                            break;
+                                        }
+                                    }
+                                    if (partsMatch && addressParts.length > 0) {
+                                        allPartsMatch = true;
+                                    }
+                                }
+                            }
+                            
+                            // 检查户籍地址
+                            if (!allPartsMatch && hitRegisteredAddress != null && !hitRegisteredAddress.trim().isEmpty()) {
+                                // 首先尝试直接包含匹配
+                                if (hitRegisteredAddress.contains(addressInput)) {
+                                    allPartsMatch = true;
+                                } else {
+                                    // 如果直接包含不匹配，按常见地名单位分割地址，检查所有片段是否都存在
+                                    String[] addressParts = addressInput.split("(?=[省市区县街道镇乡村])|(?<=[省市区县街道镇乡村])");
+                                    boolean partsMatch = true;
+                                    for (String part : addressParts) {
+                                        String trimmedPart = part != null ? part.trim() : "";
+                                        if (!trimmedPart.isEmpty() && !hitRegisteredAddress.contains(trimmedPart)) {
+                                            partsMatch = false;
+                                            break;
+                                        }
+                                    }
+                                    if (partsMatch && addressParts.length > 0) {
+                                        allPartsMatch = true;
+                                    }
+                                }
+                            }
+                            
+                            if (allPartsMatch) {
+                                Resident resident = convertMapToResident(hit);
+                                matchedResidents.add(resident);
+                            }
+                        }
+                        
+                        if (!matchedResidents.isEmpty()) {
+                            Page<Resident> page = new Page<>(current, size);
+                            page.setTotal((long) matchedResidents.size());
+                            page.setRecords(matchedResidents);
+                            return Result.success(page);
+                        }
+                    }
+                }
+                
+                // 如果没有匹配到任何结果，返回空结果
+                Page<Resident> page = new Page<>(current, size);
+                page.setTotal(0);
+                page.setRecords(new ArrayList<>());
+                return Result.success(page);
+            }
+            
+            // 合并查询参数为keyword（如果没有完全匹配，进行模糊匹配）
             StringBuilder keywordBuilder = new StringBuilder();
             if (realName != null && !realName.trim().isEmpty()) {
                 keywordBuilder.append(realName.trim());

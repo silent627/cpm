@@ -20,40 +20,17 @@
           </div>
         </div>
       </template>
-      <el-form :model="searchForm" class="search-form">
-        <el-row :gutter="20">
-          <el-col :span="12">
-            <el-form-item label="真实姓名">
-              <el-input v-model="searchForm.realName" placeholder="请输入真实姓名" clearable />
-            </el-form-item>
-            <el-form-item label="身份证号">
-              <el-input v-model="searchForm.idCard" placeholder="请输入身份证号" clearable />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="现居住地址">
-              <div class="address-selector-wrapper">
-                <RegionCascade
-                  ref="searchRegionCascadeRef"
-                  v-model="searchAddressCodes"
-                  :placeholder="['请选择省份', '请选择市', '请选择区县', '请选择乡镇街道']"
-                  @change="handleSearchAddressChange"
-                />
-                <el-input
-                  v-model="searchForm.currentAddress"
-                  placeholder="请先选择行政区划，然后输入详细地址（如：XX街道XX号）"
-                  clearable
-                  class="address-detail-input"
-                >
-                  <template #prefix>
-                    <el-icon><Location /></el-icon>
-                  </template>
-                </el-input>
-              </div>
-            </el-form-item>
-          </el-col>
-        </el-row>
-        <el-form-item class="search-actions">
+      <el-form :inline="true" :model="searchForm" class="search-form">
+        <el-form-item label="真实姓名">
+          <el-input v-model="searchForm.realName" placeholder="请输入真实姓名" clearable />
+        </el-form-item>
+        <el-form-item label="身份证号">
+          <el-input v-model="searchForm.idCard" placeholder="请输入身份证号" clearable />
+        </el-form-item>
+        <el-form-item label="现居住地址">
+          <el-input v-model="searchForm.currentAddress" placeholder="请输入现居住地址" clearable />
+        </el-form-item>
+        <el-form-item>
           <el-button type="primary" @click="handleSearch">查询</el-button>
           <el-button @click="handleReset">重置</el-button>
         </el-form-item>
@@ -1303,33 +1280,6 @@ export default {
 
 .search-form {
   margin-bottom: 20px;
-  padding: 20px;
-  background-color: #fafafa;
-  border-radius: 8px;
-}
-
-.search-form :deep(.el-form-item) {
-  margin-bottom: 18px;
-}
-
-.search-form :deep(.el-form-item__label) {
-  font-weight: 500;
-  color: #606266;
-  width: 100px !important;
-}
-
-.search-actions {
-  margin-top: 10px;
-  margin-bottom: 0 !important;
-  padding-top: 10px;
-  border-top: 1px solid #e4e7ed;
-}
-
-.search-actions :deep(.el-form-item__content) {
-  margin-left: 0 !important;
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
 }
 
 .action-buttons {

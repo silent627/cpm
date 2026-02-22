@@ -211,7 +211,35 @@ public class UserController {
             @ApiParam(value = "用户名（模糊查询）") @RequestParam(required = false) String username,
             @ApiParam(value = "角色") @RequestParam(required = false) String role) {
         try {
-            // 合并查询参数为keyword
+            // 先检查用户名的完全匹配，如果完全匹配，直接返回那一条记录
+            if (username != null && !username.trim().isEmpty()) {
+                Result<Map<String, Object>> exactMatchResult = searchServiceClient.searchUser(username.trim(), 0, 1);
+                if (exactMatchResult != null && exactMatchResult.getCode() == 200 && exactMatchResult.getData() != null) {
+                    Map<String, Object> data = exactMatchResult.getData();
+                    @SuppressWarnings("unchecked")
+                    List<Map<String, Object>> hits = (List<Map<String, Object>>) data.get("hits");
+                    if (hits != null && !hits.isEmpty()) {
+                        // 检查是否真的是完全匹配（检查用户名字段）
+                        for (Map<String, Object> hit : hits) {
+                            String hitUsername = (String) hit.get("username");
+                            if (username.trim().equals(hitUsername)) {
+                                // 找到完全匹配的记录，只返回这一条
+                                List<User> users = new ArrayList<>();
+                                User user = convertMapToUser(hit);
+                                if (role == null || role.isEmpty() || (user.getRole() != null && user.getRole().equals(role))) {
+                                    users.add(user);
+                                }
+                                Page<User> page = new Page<>(current, size);
+                                page.setTotal(users.isEmpty() ? 0L : 1L);
+                                page.setRecords(users);
+                                return Result.success(page);
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // 合并查询参数为keyword（如果没有完全匹配，进行模糊匹配）
             StringBuilder keywordBuilder = new StringBuilder();
             if (username != null && !username.trim().isEmpty()) {
                 keywordBuilder.append(username.trim());
