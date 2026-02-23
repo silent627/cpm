@@ -231,11 +231,50 @@ public class HouseholdController {
             List<Map<String, Object>> hits = (List<Map<String, Object>>) data.get("hits");
             Long total = ((Number) data.get("total")).longValue();
             
+            // 判断是否只输入了户籍地址（没有输入户籍编号和户主姓名）
+            boolean onlyAddress = (address != null && !address.trim().isEmpty()) &&
+                                 (householdNo == null || householdNo.trim().isEmpty()) &&
+                                 (headName == null || headName.trim().isEmpty());
+            
             // 转换为Household实体列表
             List<Household> households = new ArrayList<>();
             if (hits != null) {
                 for (Map<String, Object> hit : hits) {
                     try {
+                        // 如果只输入了户籍地址，需要过滤结果，只返回户籍地址匹配的记录
+                        if (onlyAddress && address != null) {
+                            String hitAddress = (String) hit.get("address");
+                            String addressInput = address.trim();
+                            
+                            // 检查户籍地址是否匹配
+                            boolean addressMatches = false;
+                            if (hitAddress != null && !hitAddress.trim().isEmpty()) {
+                                // 首先尝试直接包含匹配
+                                if (hitAddress.contains(addressInput)) {
+                                    addressMatches = true;
+                                } else {
+                                    // 如果直接包含不匹配，按常见地名单位分割地址，检查所有片段是否都存在
+                                    String[] addressParts = addressInput.split("(?=[省市区县街道镇乡村])|(?<=[省市区县街道镇乡村])");
+                                    boolean partsMatch = true;
+                                    for (String part : addressParts) {
+                                        String trimmedPart = part != null ? part.trim() : "";
+                                        if (!trimmedPart.isEmpty() && !hitAddress.contains(trimmedPart)) {
+                                            partsMatch = false;
+                                            break;
+                                        }
+                                    }
+                                    if (partsMatch && addressParts.length > 0) {
+                                        addressMatches = true;
+                                    }
+                                }
+                            }
+                            
+                            // 只有户籍地址匹配时才继续处理
+                            if (!addressMatches) {
+                                continue;
+                            }
+                        }
+                        
                         Household household = convertMapToHousehold(hit);
                         // 如果指定了status参数，进行过滤
                         if (status != null && household.getStatus() != null && !household.getStatus().equals(status)) {
@@ -249,8 +288,8 @@ public class HouseholdController {
                 }
             }
             
-            // 如果进行了status过滤，需要重新计算总数（简单处理：使用过滤后的数量）
-            if (status != null) {
+            // 如果进行了status过滤或地址过滤，需要重新计算总数（简单处理：使用过滤后的数量）
+            if (status != null || onlyAddress) {
                 total = (long) households.size();
             }
             

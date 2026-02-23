@@ -284,9 +284,8 @@ public class ResidentController {
                         
                         for (Map<String, Object> hit : hits) {
                             String hitCurrentAddress = (String) hit.get("currentAddress");
-                            String hitRegisteredAddress = (String) hit.get("registeredAddress");
                             
-                            // 检查所有地址片段是否在现居住地址或户籍地址中存在
+                            // 只检查现居住地址，不包括户籍地址
                             boolean allPartsMatch = false;
                             
                             // 检查现居住地址
@@ -301,28 +300,6 @@ public class ResidentController {
                                     for (String part : addressParts) {
                                         String trimmedPart = part != null ? part.trim() : "";
                                         if (!trimmedPart.isEmpty() && !hitCurrentAddress.contains(trimmedPart)) {
-                                            partsMatch = false;
-                                            break;
-                                        }
-                                    }
-                                    if (partsMatch && addressParts.length > 0) {
-                                        allPartsMatch = true;
-                                    }
-                                }
-                            }
-                            
-                            // 检查户籍地址
-                            if (!allPartsMatch && hitRegisteredAddress != null && !hitRegisteredAddress.trim().isEmpty()) {
-                                // 首先尝试直接包含匹配
-                                if (hitRegisteredAddress.contains(addressInput)) {
-                                    allPartsMatch = true;
-                                } else {
-                                    // 如果直接包含不匹配，按常见地名单位分割地址，检查所有片段是否都存在
-                                    String[] addressParts = addressInput.split("(?=[省市区县街道镇乡村])|(?<=[省市区县街道镇乡村])");
-                                    boolean partsMatch = true;
-                                    for (String part : addressParts) {
-                                        String trimmedPart = part != null ? part.trim() : "";
-                                        if (!trimmedPart.isEmpty() && !hitRegisteredAddress.contains(trimmedPart)) {
                                             partsMatch = false;
                                             break;
                                         }
@@ -390,11 +367,50 @@ public class ResidentController {
             List<Map<String, Object>> hits = (List<Map<String, Object>>) data.get("hits");
             Long total = ((Number) data.get("total")).longValue();
             
+            // 判断是否只输入了现居住地址（没有输入真实姓名和身份证号）
+            boolean onlyCurrentAddress = (currentAddress != null && !currentAddress.trim().isEmpty()) &&
+                                       (realName == null || realName.trim().isEmpty()) &&
+                                       (idCard == null || idCard.trim().isEmpty());
+            
             // 转换为Resident实体列表
             List<Resident> residents = new ArrayList<>();
             if (hits != null) {
                 for (Map<String, Object> hit : hits) {
                     try {
+                        // 如果只输入了现居住地址，需要过滤结果，只返回现居住地址匹配的记录
+                        if (onlyCurrentAddress && currentAddress != null) {
+                            String hitCurrentAddress = (String) hit.get("currentAddress");
+                            String addressInput = currentAddress.trim();
+                            
+                            // 检查现居住地址是否匹配
+                            boolean addressMatches = false;
+                            if (hitCurrentAddress != null && !hitCurrentAddress.trim().isEmpty()) {
+                                // 首先尝试直接包含匹配
+                                if (hitCurrentAddress.contains(addressInput)) {
+                                    addressMatches = true;
+                                } else {
+                                    // 如果直接包含不匹配，按常见地名单位分割地址，检查所有片段是否都存在
+                                    String[] addressParts = addressInput.split("(?=[省市区县街道镇乡村])|(?<=[省市区县街道镇乡村])");
+                                    boolean partsMatch = true;
+                                    for (String part : addressParts) {
+                                        String trimmedPart = part != null ? part.trim() : "";
+                                        if (!trimmedPart.isEmpty() && !hitCurrentAddress.contains(trimmedPart)) {
+                                            partsMatch = false;
+                                            break;
+                                        }
+                                    }
+                                    if (partsMatch && addressParts.length > 0) {
+                                        addressMatches = true;
+                                    }
+                                }
+                            }
+                            
+                            // 只有现居住地址匹配时才添加到结果中
+                            if (!addressMatches) {
+                                continue;
+                            }
+                        }
+                        
                         Resident resident = convertMapToResident(hit);
                         residents.add(resident);
                     } catch (Exception e) {
@@ -406,7 +422,8 @@ public class ResidentController {
             
             // 构建Page对象
             Page<Resident> page = new Page<>(current, size);
-            page.setTotal(total);
+            // 如果只输入了现居住地址，使用过滤后的结果数量
+            page.setTotal(onlyCurrentAddress ? (long) residents.size() : total);
             page.setRecords(residents);
             return Result.success(page);
             
