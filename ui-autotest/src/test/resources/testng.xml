@@ -9,8 +9,8 @@
             </run>
         </groups>
         <classes>
-            <!--            <class name="com.wuzuhao.cpm.ui.tests.LoginTests"/>-->
-            <!--            <class name="com.wuzuhao.cpm.ui.tests.PasswordChangeTests"/>-->
+            <class name="com.wuzuhao.cpm.ui.tests.LoginTests"/>
+            <class name="com.wuzuhao.cpm.ui.tests.PasswordChangeTests"/>
             <class name="com.wuzuhao.cpm.ui.tests.ResidentCrudTests"/>
         </classes>
     </test>
