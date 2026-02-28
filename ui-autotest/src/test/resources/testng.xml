@@ -1,0 +1,27 @@
+<!DOCTYPE suite SYSTEM "https://testng.org/testng-1.0.dtd" >
+<suite name="CPM-UI-Automation-Suite" verbose="1" parallel="false">
+
+    <!-- 冒烟用例组：登录 + 核心流程可按需精简 -->
+    <test name="Smoke">
+        <groups>
+            <run>
+                <!-- 需要时可在用例上增加 groups="smoke" -->
+            </run>
+        </groups>
+        <classes>
+            <!--            <class name="com.wuzuhao.cpm.ui.tests.LoginTests"/>-->
+            <!--            <class name="com.wuzuhao.cpm.ui.tests.PasswordChangeTests"/>-->
+            <class name="com.wuzuhao.cpm.ui.tests.ResidentCrudTests"/>
+        </classes>
+    </test>
+
+    <!-- 回归用例组：包含业务流程骨架 -->
+    <test name="Regression">
+        <classes>
+<!--            <class name="com.wuzuhao.cpm.ui.tests.LoginTests"/>-->
+<!--            <class name="com.wuzuhao.cpm.ui.tests.ResidentCrudTests"/>-->
+        </classes>
+    </test>
+
+</suite>
+
